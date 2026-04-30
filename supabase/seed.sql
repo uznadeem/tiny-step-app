@@ -1,0 +1,1 @@
+-- Intentionally empty. Local Supabase config runs this file after migrations.
