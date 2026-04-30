@@ -31,6 +31,16 @@ type Step = {
   done: boolean
 }
 
+type ProfilePreferences = {
+  confettiOnCompletion: boolean
+  defaultEnergy: number
+}
+
+const DEFAULT_PROFILE_PREFERENCES: ProfilePreferences = {
+  confettiOnCompletion: true,
+  defaultEnergy: 3,
+}
+
 type ConfettiPiece = {
   id: number
   left: number
@@ -54,6 +64,23 @@ const CONFETTI_PIECES: ConfettiPiece[] = Array.from({ length: 28 }, (_, id) => {
     round: seed % 2 === 0,
   }
 })
+
+function normalizePlannerPreferences(value: unknown): ProfilePreferences {
+  if (!value || typeof value !== 'object') return DEFAULT_PROFILE_PREFERENCES
+
+  const preferences = value as Partial<ProfilePreferences>
+
+  return {
+    confettiOnCompletion:
+      typeof preferences.confettiOnCompletion === 'boolean'
+        ? preferences.confettiOnCompletion
+        : DEFAULT_PROFILE_PREFERENCES.confettiOnCompletion,
+    defaultEnergy:
+      typeof preferences.defaultEnergy === 'number' && ENERGY_LEVELS.some(level => level.value === preferences.defaultEnergy)
+        ? preferences.defaultEnergy
+        : DEFAULT_PROFILE_PREFERENCES.defaultEnergy,
+  }
+}
 
 function makeSteps(task: string, energy: number | null): Step[] {
   const tinyStart = energy && energy <= 2 ? 'Sit near the task and take one slow breath' : 'Open or gather the thing you need'
@@ -126,7 +153,9 @@ export default function PlannerPage() {
   const router = useRouter()
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [checkingSession, setCheckingSession] = useState(true)
-  const [energy, setEnergy] = useState<number | null>(null)
+  const [defaultEnergy, setDefaultEnergy] = useState(DEFAULT_PROFILE_PREFERENCES.defaultEnergy)
+  const [confettiOnCompletion, setConfettiOnCompletion] = useState(DEFAULT_PROFILE_PREFERENCES.confettiOnCompletion)
+  const [energy, setEnergy] = useState<number | null>(DEFAULT_PROFILE_PREFERENCES.defaultEnergy)
   const [task, setTask] = useState('')
   const [taskName, setTaskName] = useState('')
   const [steps, setSteps] = useState<Step[]>([])
@@ -140,14 +169,31 @@ export default function PlannerPage() {
   useEffect(() => {
     let active = true
 
-    supabase.auth.getSession().then(({ data }) => {
+    const loadPlanner = async () => {
+      const { data } = await supabase.auth.getSession()
       if (!active) return
+
       if (!data.session) {
         router.replace('/login')
         return
       }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('preferences')
+        .eq('id', data.session.user.id)
+        .maybeSingle()
+
+      if (!active) return
+
+      const plannerPreferences = normalizePlannerPreferences(profile?.preferences)
+      setDefaultEnergy(plannerPreferences.defaultEnergy)
+      setEnergy(plannerPreferences.defaultEnergy)
+      setConfettiOnCompletion(plannerPreferences.confettiOnCompletion)
       setCheckingSession(false)
-    })
+    }
+
+    loadPlanner()
 
     return () => {
       active = false
@@ -158,6 +204,8 @@ export default function PlannerPage() {
   const progress = steps.length ? Math.round((doneCount / steps.length) * 100) : 0
 
   const triggerConfetti = () => {
+    if (!confettiOnCompletion) return
+
     setShowConfetti(true)
     window.setTimeout(() => setShowConfetti(false), 3000)
   }
@@ -191,7 +239,7 @@ export default function PlannerPage() {
     setTaskName('')
     setStuckAdvice('')
     setAffirmation('')
-    setEnergy(null)
+    setEnergy(defaultEnergy)
     window.setTimeout(() => inputRef.current?.focus(), 0)
   }
 
@@ -226,7 +274,10 @@ export default function PlannerPage() {
           <Link className="planner-brand" href="/">
             tiny<span>step</span>
           </Link>
-          <button type="button" onClick={handleSignOut}>Log out</button>
+          <div className="planner-topbar-actions">
+            <Link href="/profile">Profile</Link>
+            <button type="button" onClick={handleSignOut}>Log out</button>
+          </div>
         </header>
 
         <div className="planner-header">
