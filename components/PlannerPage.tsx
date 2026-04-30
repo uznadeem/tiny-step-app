@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useRouter } from 'next/navigation'
@@ -25,9 +26,11 @@ const AFFIRMATIONS = [
 ]
 
 type Step = {
+  id?: string
   text: string
   time: number
   tip?: string | null
+  stuckAdvice?: string | null
   done: boolean
 }
 
@@ -87,12 +90,47 @@ function makeSteps(task: string, energy: number | null): Step[] {
   const taskLabel = task.trim().replace(/\s+/g, ' ')
 
   return [
-    { text: tinyStart, time: 1, tip: "Make this so small it almost feels silly. That's the point.", done: false },
-    { text: `Look at "${taskLabel}" for two minutes`, time: 2, tip: 'No solving yet. Just let your brain meet the task.', done: false },
-    { text: 'Write the next obvious action in plain words', time: 3, tip: 'Use a timer if your brain likes a boundary.', done: false },
-    { text: 'Do only that next action', time: energy && energy >= 4 ? 5 : 3, tip: 'Music, a drink, or a body double can help.', done: false },
-    { text: 'Pause and decide the next tiny move', time: 2, tip: null, done: false },
+    {
+      text: tinyStart,
+      time: 1,
+      tip: "Make this so small it almost feels silly. That's the point.",
+      stuckAdvice: 'If even this feels too much, only put your hand on the nearest object related to the task. Touching it counts as starting.',
+      done: false,
+    },
+    {
+      text: `Look at "${taskLabel}" for two minutes`,
+      time: 2,
+      tip: 'No solving yet. Just let your brain meet the task.',
+      stuckAdvice: 'Set a two-minute timer and give yourself permission to stop when it rings. Your job is only to look, not to finish.',
+      done: false,
+    },
+    {
+      text: 'Write the next obvious action in plain words',
+      time: 3,
+      tip: 'Use a timer if your brain likes a boundary.',
+      stuckAdvice: 'Start the sentence with “next I can...” and write the messiest version. It does not need to be clever or complete.',
+      done: false,
+    },
+    {
+      text: 'Do only that next action',
+      time: energy && energy >= 4 ? 5 : 3,
+      tip: 'Music, a drink, or a body double can help.',
+      stuckAdvice: 'Shrink the action to the first 20 seconds. You are allowed to stop after that, and the start still counts.',
+      done: false,
+    },
+    {
+      text: 'Pause and decide the next tiny move',
+      time: 2,
+      tip: null,
+      stuckAdvice: 'Look at what changed, then choose one tiny follow-up. If your brain blanks, repeat the previous step once.',
+      done: false,
+    },
   ]
+}
+
+function getAffirmation(seed: string) {
+  const total = seed.split('').reduce((sum, character) => sum + character.charCodeAt(0), 0)
+  return AFFIRMATIONS[total % AFFIRMATIONS.length]
 }
 
 function Confetti({ active }: { active: boolean }) {
@@ -156,6 +194,8 @@ export default function PlannerPage() {
   const [defaultEnergy, setDefaultEnergy] = useState(DEFAULT_PROFILE_PREFERENCES.defaultEnergy)
   const [confettiOnCompletion, setConfettiOnCompletion] = useState(DEFAULT_PROFILE_PREFERENCES.confettiOnCompletion)
   const [energy, setEnergy] = useState<number | null>(DEFAULT_PROFILE_PREFERENCES.defaultEnergy)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [displayName, setDisplayName] = useState('')
   const [task, setTask] = useState('')
   const [taskName, setTaskName] = useState('')
   const [steps, setSteps] = useState<Step[]>([])
@@ -164,6 +204,7 @@ export default function PlannerPage() {
   const [affirmation, setAffirmation] = useState('')
   const [brainDump, setBrainDump] = useState('')
   const [showBrainDump, setShowBrainDump] = useState(false)
+  const [stuck, setStuck] = useState(false)
   const [stuckAdvice, setStuckAdvice] = useState('')
 
   useEffect(() => {
@@ -180,7 +221,7 @@ export default function PlannerPage() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('preferences')
+        .select('display_name, preferences')
         .eq('id', data.session.user.id)
         .maybeSingle()
 
@@ -190,6 +231,7 @@ export default function PlannerPage() {
       setDefaultEnergy(plannerPreferences.defaultEnergy)
       setEnergy(plannerPreferences.defaultEnergy)
       setConfettiOnCompletion(plannerPreferences.confettiOnCompletion)
+      setDisplayName(profile?.display_name || data.session.user.user_metadata?.display_name || 'Tinystep friend')
       setCheckingSession(false)
     }
 
@@ -212,22 +254,151 @@ export default function PlannerPage() {
 
   const handleBreakdown = async () => {
     if (!task.trim()) return
+    const taskToBreakDown = task.trim()
+    const fallbackSteps = makeSteps(taskToBreakDown, energy)
+
     setLoading(true)
     setSteps([])
-    setTaskName(task.trim())
+    setTaskName(taskToBreakDown)
+    setStuck(false)
     setStuckAdvice('')
 
-    window.setTimeout(() => {
-      setSteps(makeSteps(task, energy))
-      setAffirmation(AFFIRMATIONS[Math.floor(Math.random() * AFFIRMATIONS.length)])
+    try {
+      const { data } = await supabase.auth.getSession()
+      const accessToken = data.session?.access_token
+
+      if (!accessToken) {
+        router.replace('/login')
+        return
+      }
+
+      const response = await fetch('/api/planner/breakdown', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          task: taskToBreakDown,
+          energy: energy || defaultEnergy,
+          brainDump,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Planner API request failed.')
+      }
+
+      const result = await response.json()
+
+      const nextSteps = Array.isArray(result.steps)
+        ? result.steps
+            .map((step: Partial<Step>) => ({
+              text: typeof step.text === 'string' ? step.text : '',
+              time: typeof step.time === 'number' ? step.time : 2,
+              tip: typeof step.tip === 'string' ? step.tip : null,
+              stuckAdvice: typeof step.stuckAdvice === 'string' ? step.stuckAdvice : null,
+              done: false,
+            }))
+            .filter((step: Step) => step.text.trim())
+        : fallbackSteps
+
+      const generatedSteps = nextSteps.length ? nextSteps : fallbackSteps
+      const persistedSteps = await persistTask(taskToBreakDown, generatedSteps)
+      setSteps(persistedSteps)
+      setAffirmation(
+        typeof result.affirmation === 'string' && result.affirmation.trim()
+          ? result.affirmation.trim()
+          : getAffirmation(taskToBreakDown)
+      )
+    } catch {
+      const persistedSteps = await persistTask(taskToBreakDown, fallbackSteps)
+      setSteps(persistedSteps)
+      setAffirmation(getAffirmation(taskToBreakDown))
+    } finally {
       setTask('')
       setLoading(false)
-    }, 450)
+    }
   }
 
-  const handleToggle = (index: number) => {
+  const persistTask = async (inputText: string, generatedSteps: Step[]) => {
+    const { data: sessionData } = await supabase.auth.getSession()
+    const userId = sessionData.session?.user.id
+
+    if (!userId) {
+      router.replace('/login')
+      return generatedSteps
+    }
+
+    const { data: taskRow, error: taskError } = await supabase
+      .from('tasks')
+      .insert({
+        user_id: userId,
+        input_text: inputText,
+        energy_level: energy || defaultEnergy,
+        brain_dump: brainDump.trim() || null,
+      })
+      .select('id')
+      .single()
+
+    if (taskError || !taskRow?.id) {
+      return generatedSteps
+    }
+
+    const { data: subtaskRows, error: subtaskError } = await supabase
+      .from('subtasks')
+      .insert(
+        generatedSteps.map((step, index) => ({
+          task_id: taskRow.id,
+          description: step.text,
+          status: step.done ? 'completed' : 'pending',
+          sort_order: index + 1,
+          time_minutes: step.time,
+          tip: step.tip || null,
+          stuck_advice: step.stuckAdvice || null,
+          completed_at: step.done ? new Date().toISOString() : null,
+        }))
+      )
+      .select('id, sort_order')
+
+    if (subtaskError || !subtaskRows) {
+      await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', taskRow.id)
+
+      return generatedSteps
+    }
+
+    return generatedSteps.map((step, index) => ({
+      ...step,
+      id: subtaskRows.find(row => row.sort_order === index + 1)?.id,
+    }))
+  }
+
+  const handleToggle = async (index: number) => {
     const updated = steps.map((step, stepIndex) => (stepIndex === index ? { ...step, done: !step.done } : step))
     setSteps(updated)
+    setStuck(false)
+    setStuckAdvice('')
+
+    const toggledStep = updated[index]
+    const previousStep = steps[index]
+
+    if (previousStep?.id) {
+      const { error } = await supabase
+        .from('subtasks')
+        .update({
+          status: toggledStep.done ? 'completed' : 'pending',
+          completed_at: toggledStep.done ? new Date().toISOString() : null,
+        })
+        .eq('id', previousStep.id)
+
+      if (error) {
+        setSteps(steps)
+        return
+      }
+    }
 
     if (!steps[index].done && updated.every(step => step.done)) {
       triggerConfetti()
@@ -237,19 +408,36 @@ export default function PlannerPage() {
   const resetPlanner = () => {
     setSteps([])
     setTaskName('')
+    setStuck(false)
     setStuckAdvice('')
     setAffirmation('')
     setEnergy(defaultEnergy)
     window.setTimeout(() => inputRef.current?.focus(), 0)
   }
 
+  const handleDeleteStep = async (index: number) => {
+    const stepToDelete = steps[index]
+    setStuck(false)
+    setStuckAdvice('')
+    setSteps(current => current.filter((_, indexToKeep) => indexToKeep !== index))
+
+    if (stepToDelete?.id) {
+      const { error } = await supabase
+        .from('subtasks')
+        .delete()
+        .eq('id', stepToDelete.id)
+
+      if (error) {
+        setSteps(steps)
+      }
+    }
+  }
+
   const handleStuck = () => {
-    const remaining = steps.find(step => !step.done)?.text
-    setStuckAdvice(
-      remaining
-        ? `Shrink it again: do only the first 20 seconds of "${remaining}". You are allowed to stop after that, and starting still counts. 💛`
-        : "Take a breath and notice that you're already further than when you started. Tiny wins count."
-    )
+    const nextStep = steps.find(step => !step.done)
+
+    setStuck(true)
+    setStuckAdvice(nextStep?.stuckAdvice || "Take a 5-minute walk and come back. Movement is magic for ADHD brains. You've got this!")
   }
 
   const handleSignOut = async () => {
@@ -269,15 +457,37 @@ export default function PlannerPage() {
     <main className="planner-page">
       <Confetti active={showConfetti} />
 
+      <button
+        className="planner-menu-button"
+        type="button"
+        onClick={() => setDrawerOpen(true)}
+        aria-label="Open navigation menu"
+        aria-expanded={drawerOpen}
+      >
+        <Image src="/drawer-icon.png" alt="" width={24} height={24} />
+      </button>
+
+      {drawerOpen && <button className="planner-drawer-backdrop" type="button" aria-label="Close navigation menu" onClick={() => setDrawerOpen(false)} />}
+
+      <aside className={`planner-drawer${drawerOpen ? ' is-open' : ''}`} aria-hidden={!drawerOpen}>
+        <Link className="planner-drawer-logo" href="/dashboard" onClick={() => setDrawerOpen(false)}>tiny<span>step</span></Link>
+        <div className="planner-drawer-avatar">🌸</div>
+        <h2>{displayName}</h2>
+        <p>⭐ Yearly plan</p>
+
+        <nav className="planner-drawer-nav" aria-label="Dashboard menu">
+          <Link href="/profile" onClick={() => setDrawerOpen(false)}><span>⚙️</span> Preferences</Link>
+          <Link href="/history" onClick={() => setDrawerOpen(false)}><span>✅</span> Task History</Link>
+          <button type="button" disabled><span>💳</span> Billing</button>
+          <button className="logout" type="button" onClick={handleSignOut}><span>🚪</span> Log out</button>
+        </nav>
+      </aside>
+
       <section className="planner-shell">
         <header className="planner-topbar">
           <Link className="planner-brand" href="/">
             tiny<span>step</span>
           </Link>
-          <div className="planner-topbar-actions">
-            <Link href="/profile">Profile</Link>
-            <button type="button" onClick={handleSignOut}>Log out</button>
-          </div>
         </header>
 
         <div className="planner-header">
@@ -369,18 +579,18 @@ export default function PlannerPage() {
                   step={step}
                   index={index}
                   onToggle={handleToggle}
-                  onDelete={stepIndex => setSteps(current => current.filter((_, indexToKeep) => indexToKeep !== stepIndex))}
+                  onDelete={handleDeleteStep}
                 />
               ))}
             </div>
 
-            {!stuckAdvice && doneCount < steps.length && (
+            {!stuck && doneCount < steps.length && (
               <button className="planner-stuck" type="button" onClick={handleStuck}>
                 😵‍💫 I&apos;m stuck — help me get unstuck
               </button>
             )}
 
-            {stuckAdvice && (
+            {stuck && (
               <div className="planner-advice">
                 <strong>💛 You&apos;ve got this!</strong>
                 <p>{stuckAdvice}</p>

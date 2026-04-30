@@ -135,6 +135,8 @@ export default function ProfileSettingsPage() {
 
             <nav className="profile-nav" aria-label="Profile settings">
               <button className="active" type="button"><span>⚙️</span> Preferences</button>
+              <Link href="/history"><span>✅</span> Task History</Link>
+              <button type="button" disabled><span>💳</span> Billing</button>
               <button className="logout" type="button" onClick={handleSignOut}><span>🚪</span> Log out</button>
             </nav>
           </aside>
