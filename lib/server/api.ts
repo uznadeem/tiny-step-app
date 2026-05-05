@@ -1,5 +1,5 @@
-export function jsonError(message: string, status: number) {
-  return Response.json({ error: message }, { status })
+export function jsonError(message: string, status: number, headers?: HeadersInit) {
+  return Response.json({ error: message }, { status, headers })
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

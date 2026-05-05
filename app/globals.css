@@ -1077,6 +1077,13 @@ footer strong { color: rgba(255,255,255,0.7); }
   background: #e5e7eb;
   color: #9ca3af;
 }
+.planner-error {
+  margin-top: 10px;
+  color: #be123c;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+}
 .planner-brain {
   animation: fadeSlideIn 0.5s ease 0.2s both;
 }

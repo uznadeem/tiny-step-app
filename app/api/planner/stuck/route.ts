@@ -1,6 +1,7 @@
 import { jsonError, parseString } from '@/lib/server/api'
 import { createAnthropicMessage } from '@/lib/server/anthropic'
-import { assertAuthenticated } from '@/lib/server/supabase'
+import { consumeLlmQuota, LlmQuotaError, quotaExceededMessage, quotaHeaders, type LlmQuota } from '@/lib/server/llm-quota'
+import { getAuthenticatedUser } from '@/lib/server/supabase'
 
 export const runtime = 'nodejs'
 
@@ -14,8 +15,10 @@ function normalizeRemainingSteps(value: unknown) {
 }
 
 export async function POST(request: Request) {
+  let quota: LlmQuota | null = null
+
   try {
-    const authenticated = await assertAuthenticated(request)
+    const authenticated = await getAuthenticatedUser(request)
 
     if (!authenticated) {
       return jsonError('Unauthorized.', 401)
@@ -37,6 +40,13 @@ export async function POST(request: Request) {
       return jsonError('At least one remaining step is required.', 400)
     }
 
+    quota = await consumeLlmQuota(authenticated.id)
+    const headers = quotaHeaders(quota)
+
+    if (!quota.allowed) {
+      return jsonError(quotaExceededMessage(quota), 429, headers)
+    }
+
     const advice = await createAnthropicMessage({
       maxTokens: 220,
       system:
@@ -52,11 +62,17 @@ export async function POST(request: Request) {
     const normalizedAdvice =
       advice.trim() || "Take a 5-minute walk and come back. Movement can help reset an ADHD brain. You've got this."
 
-    return Response.json({ advice: normalizedAdvice })
+    return Response.json({ advice: normalizedAdvice }, { headers })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Stuck advice request failed.'
-    const status = message === 'Missing ANTHROPIC_API_KEY.' ? 503 : message === 'AI planner request failed.' ? 502 : 500
+    const message =
+      error instanceof LlmQuotaError
+        ? 'Unable to verify AI usage quota.'
+        : error instanceof Error
+          ? error.message
+          : 'Stuck advice request failed.'
+    const status =
+      error instanceof LlmQuotaError ? 503 : message === 'Missing ANTHROPIC_API_KEY.' ? 503 : message === 'AI planner request failed.' ? 502 : 500
 
-    return jsonError(message, status)
+    return jsonError(message, status, quota ? quotaHeaders(quota) : undefined)
   }
 }

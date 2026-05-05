@@ -1,11 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
+import type { User } from '@supabase/supabase-js'
 
-export async function assertAuthenticated(request: Request) {
+export async function getAuthenticatedUser(request: Request): Promise<User | null> {
   const authHeader = request.headers.get('authorization')
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : ''
 
   if (!token) {
-    return false
+    return null
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -25,5 +26,13 @@ export async function assertAuthenticated(request: Request) {
 
   const { data, error } = await supabase.auth.getUser(token)
 
-  return Boolean(data.user && !error)
+  if (error || !data.user) {
+    return null
+  }
+
+  return data.user
+}
+
+export async function assertAuthenticated(request: Request) {
+  return Boolean(await getAuthenticatedUser(request))
 }

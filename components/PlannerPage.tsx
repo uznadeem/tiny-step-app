@@ -127,6 +127,15 @@ function getAffirmation(seed: string) {
   return AFFIRMATIONS[total % AFFIRMATIONS.length]
 }
 
+async function readApiError(response: Response, fallback: string) {
+  try {
+    const body = await response.json()
+    return typeof body?.error === 'string' && body.error.trim() ? body.error.trim() : fallback
+  } catch {
+    return fallback
+  }
+}
+
 function Confetti({ active }: { active: boolean }) {
   const colors = ['#FF6B6B', '#FFE66D', '#4ECDC4', '#C7B8EA', '#FF8B94', '#A8E6CF']
 
@@ -201,6 +210,7 @@ export default function PlannerPage() {
   const [stuck, setStuck] = useState(false)
   const [stuckAdvice, setStuckAdvice] = useState('')
   const [loadingStuck, setLoadingStuck] = useState(false)
+  const [plannerError, setPlannerError] = useState('')
 
   useEffect(() => {
     let active = true
@@ -258,6 +268,8 @@ export default function PlannerPage() {
     setStuck(false)
     setStuckAdvice('')
     setLoadingStuck(false)
+    setPlannerError('')
+    let shouldClearTask = false
 
     try {
       const { data } = await supabase.auth.getSession()
@@ -282,6 +294,12 @@ export default function PlannerPage() {
       })
 
       if (!response.ok) {
+        const message = await readApiError(response, 'Planner API request failed.')
+        if (response.status === 429) {
+          setPlannerError(message)
+          return
+        }
+
         throw new Error('Planner API request failed.')
       }
 
@@ -306,12 +324,16 @@ export default function PlannerPage() {
           ? result.affirmation.trim()
           : getAffirmation(taskToBreakDown)
       )
+      shouldClearTask = true
     } catch {
       const persistedSteps = await persistTask(taskToBreakDown, fallbackSteps)
       setSteps(persistedSteps)
       setAffirmation(getAffirmation(taskToBreakDown))
+      shouldClearTask = true
     } finally {
-      setTask('')
+      if (shouldClearTask) {
+        setTask('')
+      }
       setLoading(false)
     }
   }
@@ -440,6 +462,7 @@ export default function PlannerPage() {
     setStuck(true)
     setLoadingStuck(true)
     setStuckAdvice('')
+    setPlannerError('')
 
     try {
       const { data } = await supabase.auth.getSession()
@@ -463,6 +486,12 @@ export default function PlannerPage() {
       })
 
       if (!response.ok) {
+        const message = await readApiError(response, 'Stuck API request failed.')
+        if (response.status === 429) {
+          setStuckAdvice(message)
+          return
+        }
+
         throw new Error('Stuck API request failed.')
       }
 
@@ -580,6 +609,7 @@ export default function PlannerPage() {
               <button className="planner-primary" type="button" disabled={!task.trim() || loading} onClick={handleBreakdown}>
                 {loading ? '✨ Breaking it down...' : '✨ Make it tiny for me'}
               </button>
+              {plannerError && <p className="planner-error">{plannerError}</p>}
             </section>
 
             <section className="planner-brain">
