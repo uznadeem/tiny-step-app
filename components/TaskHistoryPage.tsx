@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
+import { playCheckboxSound, playCompletionSound } from '@/lib/sound-effects'
 
 type SubtaskStatus = 'pending' | 'completed'
 type HistoryFilter = 'all' | 'completed' | 'in_progress'
@@ -28,8 +29,26 @@ type HistoryTask = {
   subtasks: HistorySubtask[]
 }
 
+type HistoryPreferences = {
+  soundEffects: boolean
+}
+
+const DEFAULT_HISTORY_PREFERENCES: HistoryPreferences = {
+  soundEffects: false,
+}
+
 function isTaskCompleted(task: HistoryTask) {
   return task.subtasks.length > 0 && task.subtasks.every(subtask => subtask.status === 'completed')
+}
+
+function normalizeHistoryPreferences(value: unknown): HistoryPreferences {
+  if (!value || typeof value !== 'object') return DEFAULT_HISTORY_PREFERENCES
+
+  const preferences = value as Partial<HistoryPreferences>
+
+  return {
+    soundEffects: typeof preferences.soundEffects === 'boolean' ? preferences.soundEffects : DEFAULT_HISTORY_PREFERENCES.soundEffects,
+  }
 }
 
 function formatRelativeDate(value: string) {
@@ -52,6 +71,7 @@ export default function TaskHistoryPage() {
   const [tasks, setTasks] = useState<HistoryTask[]>([])
   const [filter, setFilter] = useState<HistoryFilter>('all')
   const [expandedTaskId, setExpandedTaskId] = useState('')
+  const [soundEffects, setSoundEffects] = useState(DEFAULT_HISTORY_PREFERENCES.soundEffects)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -70,7 +90,7 @@ export default function TaskHistoryPage() {
       const [{ data: profile }, { data: taskRows, error: historyError }] = await Promise.all([
         supabase
           .from('profiles')
-          .select('display_name')
+          .select('display_name, preferences')
           .eq('id', user.id)
           .maybeSingle(),
         supabase
@@ -98,6 +118,7 @@ export default function TaskHistoryPage() {
       if (!active) return
 
       setDisplayName(profile?.display_name || user.user_metadata?.display_name || 'Tinystep friend')
+      setSoundEffects(normalizeHistoryPreferences(profile?.preferences).soundEffects)
       setTasks(
         (taskRows || []).map(task => ({
           ...task,
@@ -152,8 +173,9 @@ export default function TaskHistoryPage() {
     const task = tasks.find(item => item.id === taskId)
     const subtask = task?.subtasks.find(item => item.id === subtaskId)
 
-    if (!subtask) return
+    if (!task || !subtask) return
 
+    const wasCompleted = task ? isTaskCompleted(task) : false
     const nextStatus: SubtaskStatus = subtask.status === 'completed' ? 'pending' : 'completed'
     const nextCompletedAt = nextStatus === 'completed' ? new Date().toISOString() : null
     const previousTasks = tasks
@@ -185,6 +207,21 @@ export default function TaskHistoryPage() {
       setTasks(previousTasks)
       setError(updateError.message)
     } else {
+      const nextTask = {
+        ...task,
+        subtasks: task.subtasks.map(step =>
+          step.id === subtaskId ? { ...step, status: nextStatus, completed_at: nextCompletedAt } : step
+        ),
+      }
+      const completedTask = !wasCompleted && isTaskCompleted(nextTask)
+
+      if (soundEffects) {
+        playCheckboxSound()
+        if (completedTask) {
+          playCompletionSound()
+        }
+      }
+
       setError('')
     }
   }

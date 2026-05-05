@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
+import { playCheckboxSound, playCompletionSound } from '@/lib/sound-effects'
 
 const ENERGY_LEVELS = [
   { label: '🪫 Running on fumes', value: 1, color: '#f87171' },
@@ -35,11 +36,13 @@ type Step = {
 
 type ProfilePreferences = {
   confettiOnCompletion: boolean
+  soundEffects: boolean
   defaultEnergy: number
 }
 
 const DEFAULT_PROFILE_PREFERENCES: ProfilePreferences = {
   confettiOnCompletion: true,
+  soundEffects: false,
   defaultEnergy: 3,
 }
 
@@ -77,6 +80,10 @@ function normalizePlannerPreferences(value: unknown): ProfilePreferences {
       typeof preferences.confettiOnCompletion === 'boolean'
         ? preferences.confettiOnCompletion
         : DEFAULT_PROFILE_PREFERENCES.confettiOnCompletion,
+    soundEffects:
+      typeof preferences.soundEffects === 'boolean'
+        ? preferences.soundEffects
+        : DEFAULT_PROFILE_PREFERENCES.soundEffects,
     defaultEnergy:
       typeof preferences.defaultEnergy === 'number' && ENERGY_LEVELS.some(level => level.value === preferences.defaultEnergy)
         ? preferences.defaultEnergy
@@ -196,6 +203,7 @@ export default function PlannerPage() {
   const [checkingSession, setCheckingSession] = useState(true)
   const [defaultEnergy, setDefaultEnergy] = useState(DEFAULT_PROFILE_PREFERENCES.defaultEnergy)
   const [confettiOnCompletion, setConfettiOnCompletion] = useState(DEFAULT_PROFILE_PREFERENCES.confettiOnCompletion)
+  const [soundEffects, setSoundEffects] = useState(DEFAULT_PROFILE_PREFERENCES.soundEffects)
   const [energy, setEnergy] = useState<number | null>(DEFAULT_PROFILE_PREFERENCES.defaultEnergy)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [displayName, setDisplayName] = useState('')
@@ -236,6 +244,7 @@ export default function PlannerPage() {
       setDefaultEnergy(plannerPreferences.defaultEnergy)
       setEnergy(plannerPreferences.defaultEnergy)
       setConfettiOnCompletion(plannerPreferences.confettiOnCompletion)
+      setSoundEffects(plannerPreferences.soundEffects)
       setDisplayName(profile?.display_name || data.session.user.user_metadata?.display_name || 'Tinystep friend')
       setCheckingSession(false)
     }
@@ -402,6 +411,7 @@ export default function PlannerPage() {
 
     const toggledStep = updated[index]
     const previousStep = steps[index]
+    const completedTask = !previousStep.done && updated.every(step => step.done)
 
     if (previousStep?.id) {
       const { error } = await supabase
@@ -418,7 +428,14 @@ export default function PlannerPage() {
       }
     }
 
-    if (!steps[index].done && updated.every(step => step.done)) {
+    if (soundEffects) {
+      playCheckboxSound()
+      if (completedTask) {
+        playCompletionSound()
+      }
+    }
+
+    if (completedTask) {
       triggerConfetti()
     }
   }
