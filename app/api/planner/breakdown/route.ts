@@ -1,5 +1,5 @@
 import { extractJson, isRecord, jsonError, parseString } from '@/lib/server/api'
-import { createOpenAIChatCompletion } from '@/lib/server/openai'
+import { createAnthropicMessage } from '@/lib/server/anthropic'
 import { assertAuthenticated } from '@/lib/server/supabase'
 
 const ENERGY_LABELS: Record<number, string> = {
@@ -14,7 +14,6 @@ type PlannerStep = {
   text: string
   time: number
   tip: string | null
-  stuckAdvice: string
 }
 
 type PlannerResponse = {
@@ -36,14 +35,10 @@ function normalizePlannerResponse(value: unknown): PlannerResponse {
       const text = parseString(step.text)
       const time = typeof step.time === 'number' && Number.isFinite(step.time) ? Math.max(1, Math.min(15, Math.round(step.time))) : 2
       const tip = typeof step.tip === 'string' && step.tip.trim() ? step.tip.trim() : null
-      const stuckAdvice =
-        typeof step.stuckAdvice === 'string' && step.stuckAdvice.trim()
-          ? step.stuckAdvice.trim()
-          : 'Shrink this step to the first 20 seconds. Starting still counts.'
 
       if (!text) return null
 
-      return { text, time, tip, stuckAdvice }
+      return { text, time, tip }
     })
     .filter((step): step is PlannerStep => Boolean(step))
 
@@ -82,24 +77,19 @@ export async function POST(request: Request) {
     }
 
     const energyLabel = ENERGY_LABELS[energy]
-    const text = await createOpenAIChatCompletion({
+    const text = await createAnthropicMessage({
       maxTokens: 1400,
-      json: true,
-      messages: [
-        {
-          role: 'system',
-          content: `You are a warm, supportive ADHD coach for women. Break tasks into tiny, dopamine-friendly micro-steps.
+      system: `You are a warm, supportive ADHD coach for women. Break tasks into tiny, dopamine-friendly micro-steps.
 Return ONLY valid JSON like this (no markdown, no extra text):
-{"steps": [{"text": "step description", "time": 2, "tip": "optional ADHD-friendly tip or null", "stuckAdvice": "one compassionate practical tip for this exact step"}]}
+{"steps": [{"text": "step description", "time": 2, "tip": "optional ADHD-friendly tip or null"}]}
 Rules:
 - 4-8 steps max
 - Each step should take 1-5 minutes
 - Use action verbs, be specific, be encouraging
 - Tips should be practical ADHD hacks (body double, music, reward, etc.)
-- stuckAdvice is required for every step, 1-2 sentences max, and should help if the user freezes on that specific step
 - Consider energy level: ${energyLabel}
-- Make first step IMPOSSIBLY easy (under 1 min) to beat task paralysis`
-        },
+- Make first step IMPOSSIBLY easy (under 1 min) to beat task paralysis`,
+      messages: [
         {
           role: 'user',
           content: brainDump ? `Task: ${task}\nBrain dump: ${brainDump}` : `Task: ${task}`
@@ -111,7 +101,7 @@ Rules:
     return Response.json(parsed)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Planner request failed.'
-    const status = message === 'Missing OPENAI_API_KEY.' ? 503 : message === 'AI planner request failed.' ? 502 : 500
+    const status = message === 'Missing ANTHROPIC_API_KEY.' ? 503 : message === 'AI planner request failed.' ? 502 : 500
 
     return jsonError(message, status)
   }

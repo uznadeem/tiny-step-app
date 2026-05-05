@@ -30,7 +30,6 @@ type Step = {
   text: string
   time: number
   tip?: string | null
-  stuckAdvice?: string | null
   done: boolean
 }
 
@@ -94,35 +93,30 @@ function makeSteps(task: string, energy: number | null): Step[] {
       text: tinyStart,
       time: 1,
       tip: "Make this so small it almost feels silly. That's the point.",
-      stuckAdvice: 'If even this feels too much, only put your hand on the nearest object related to the task. Touching it counts as starting.',
       done: false,
     },
     {
       text: `Look at "${taskLabel}" for two minutes`,
       time: 2,
       tip: 'No solving yet. Just let your brain meet the task.',
-      stuckAdvice: 'Set a two-minute timer and give yourself permission to stop when it rings. Your job is only to look, not to finish.',
       done: false,
     },
     {
       text: 'Write the next obvious action in plain words',
       time: 3,
       tip: 'Use a timer if your brain likes a boundary.',
-      stuckAdvice: 'Start the sentence with “next I can...” and write the messiest version. It does not need to be clever or complete.',
       done: false,
     },
     {
       text: 'Do only that next action',
       time: energy && energy >= 4 ? 5 : 3,
       tip: 'Music, a drink, or a body double can help.',
-      stuckAdvice: 'Shrink the action to the first 20 seconds. You are allowed to stop after that, and the start still counts.',
       done: false,
     },
     {
       text: 'Pause and decide the next tiny move',
       time: 2,
       tip: null,
-      stuckAdvice: 'Look at what changed, then choose one tiny follow-up. If your brain blanks, repeat the previous step once.',
       done: false,
     },
   ]
@@ -206,6 +200,7 @@ export default function PlannerPage() {
   const [showBrainDump, setShowBrainDump] = useState(false)
   const [stuck, setStuck] = useState(false)
   const [stuckAdvice, setStuckAdvice] = useState('')
+  const [loadingStuck, setLoadingStuck] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -262,6 +257,7 @@ export default function PlannerPage() {
     setTaskName(taskToBreakDown)
     setStuck(false)
     setStuckAdvice('')
+    setLoadingStuck(false)
 
     try {
       const { data } = await supabase.auth.getSession()
@@ -297,7 +293,6 @@ export default function PlannerPage() {
               text: typeof step.text === 'string' ? step.text : '',
               time: typeof step.time === 'number' ? step.time : 2,
               tip: typeof step.tip === 'string' ? step.tip : null,
-              stuckAdvice: typeof step.stuckAdvice === 'string' ? step.stuckAdvice : null,
               done: false,
             }))
             .filter((step: Step) => step.text.trim())
@@ -355,7 +350,7 @@ export default function PlannerPage() {
           sort_order: index + 1,
           time_minutes: step.time,
           tip: step.tip || null,
-          stuck_advice: step.stuckAdvice || null,
+          stuck_advice: null,
           completed_at: step.done ? new Date().toISOString() : null,
         }))
       )
@@ -381,6 +376,7 @@ export default function PlannerPage() {
     setSteps(updated)
     setStuck(false)
     setStuckAdvice('')
+    setLoadingStuck(false)
 
     const toggledStep = updated[index]
     const previousStep = steps[index]
@@ -410,6 +406,7 @@ export default function PlannerPage() {
     setTaskName('')
     setStuck(false)
     setStuckAdvice('')
+    setLoadingStuck(false)
     setAffirmation('')
     setEnergy(defaultEnergy)
     window.setTimeout(() => inputRef.current?.focus(), 0)
@@ -419,6 +416,7 @@ export default function PlannerPage() {
     const stepToDelete = steps[index]
     setStuck(false)
     setStuckAdvice('')
+    setLoadingStuck(false)
     setSteps(current => current.filter((_, indexToKeep) => indexToKeep !== index))
 
     if (stepToDelete?.id) {
@@ -433,11 +431,60 @@ export default function PlannerPage() {
     }
   }
 
-  const handleStuck = () => {
+  const handleStuck = async () => {
     const nextStep = steps.find(step => !step.done)
+    const remainingSteps = steps.filter(step => !step.done).map(step => step.text)
+
+    if (!nextStep || !remainingSteps.length) return
 
     setStuck(true)
-    setStuckAdvice(nextStep?.stuckAdvice || "Take a 5-minute walk and come back. Movement is magic for ADHD brains. You've got this!")
+    setLoadingStuck(true)
+    setStuckAdvice('')
+
+    try {
+      const { data } = await supabase.auth.getSession()
+      const accessToken = data.session?.access_token
+
+      if (!accessToken) {
+        router.replace('/login')
+        return
+      }
+
+      const response = await fetch('/api/planner/stuck', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          taskName,
+          remainingSteps,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Stuck API request failed.')
+      }
+
+      const result = await response.json()
+      const advice =
+        typeof result.advice === 'string' && result.advice.trim()
+          ? result.advice.trim()
+          : "Take a 5-minute walk and come back. Movement is magic for ADHD brains. You've got this!"
+
+      setStuckAdvice(advice)
+
+      if (nextStep.id) {
+        await supabase
+          .from('subtasks')
+          .update({ stuck_advice: advice })
+          .eq('id', nextStep.id)
+      }
+    } catch {
+      setStuckAdvice("Take a 5-minute walk and come back. Movement is magic for ADHD brains. You've got this!")
+    } finally {
+      setLoadingStuck(false)
+    }
   }
 
   const handleSignOut = async () => {
@@ -593,7 +640,7 @@ export default function PlannerPage() {
             {stuck && (
               <div className="planner-advice">
                 <strong>💛 You&apos;ve got this!</strong>
-                <p>{stuckAdvice}</p>
+                <p>{loadingStuck ? 'Finding the right words for you...' : stuckAdvice}</p>
               </div>
             )}
 
