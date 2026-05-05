@@ -131,6 +131,29 @@ export default function AuthForm({ mode }: AuthFormProps) {
     }
   }
 
+  const handleGoogleAuth = async () => {
+    setLoading(true)
+    setError('')
+    setMessage('')
+
+    try {
+      const { error: googleError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+          queryParams: {
+            prompt: 'select_account',
+          },
+        },
+      })
+
+      if (googleError) throw googleError
+    } catch (authError) {
+      setError(authError instanceof Error ? authError.message : 'Google sign-in failed. Please try again.')
+      setLoading(false)
+    }
+  }
+
   return (
     <main className="auth-page">
       <section className="auth-shell" aria-label={copy.heading}>
@@ -151,17 +174,20 @@ export default function AuthForm({ mode }: AuthFormProps) {
           <p className="auth-tagline">{copy.tagline}</p>
           <h1 className="auth-heading">{copy.heading}</h1>
 
-          <button className="auth-google-placeholder" type="button" disabled>
-            <GoogleIcon />
-            Continue with Google
-            <span>Coming soon</span>
-          </button>
+          {mode !== 'reset' && (
+            <>
+              <button className="auth-google-placeholder" type="button" onClick={handleGoogleAuth} disabled={loading}>
+                <GoogleIcon />
+                Continue with Google
+              </button>
 
-          <div className="auth-divider">
-            <span />
-            <strong>or</strong>
-            <span />
-          </div>
+              <div className="auth-divider">
+                <span />
+                <strong>or</strong>
+                <span />
+              </div>
+            </>
+          )}
 
           <form className="auth-form" onSubmit={handleSubmit}>
             {mode === 'signup' && (
