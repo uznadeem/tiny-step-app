@@ -4,6 +4,7 @@ export type AdminProfile = {
   id: string
   email: string | null
   display_name: string | null
+  status: 'trial' | 'active' | 'inactive'
   created_at: string
 }
 
@@ -29,7 +30,7 @@ export type AdminUserRow = {
   plan: string
   tasksDone: number
   totalTasks: number
-  status: 'Active' | 'Inactive'
+  status: 'Trial' | 'Active' | 'Inactive'
 }
 
 export type AdminTaskRow = {
@@ -42,6 +43,11 @@ export type AdminTaskRow = {
 }
 
 const PLAN_SEQUENCE = ['Annual', 'Monthly', 'Trial', 'Annual', 'Monthly']
+const PROFILE_STATUS_LABELS: Record<AdminProfile['status'], AdminUserRow['status']> = {
+  trial: 'Trial',
+  active: 'Active',
+  inactive: 'Inactive',
+}
 
 export function isCompletedTask(task: AdminTask) {
   return task.subtasks.length > 0 && task.subtasks.every(subtask => subtask.status === 'completed')
@@ -108,7 +114,7 @@ export function buildUserRows(profiles: AdminProfile[], tasks: AdminTask[]) {
       plan: PLAN_SEQUENCE[index % PLAN_SEQUENCE.length],
       tasksDone,
       totalTasks: userTasks.length,
-      status: userTasks.length ? 'Active' : 'Inactive',
+      status: PROFILE_STATUS_LABELS[profile.status] || 'Trial',
     }
   })
 }
@@ -144,7 +150,7 @@ export async function getAdminData() {
   const [{ data: profiles, error: profilesError }, { data: tasks, error: tasksError }] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id, email, display_name, created_at')
+      .select('id, email, display_name, status, created_at')
       .order('created_at', { ascending: false }),
     supabase
       .from('tasks')
