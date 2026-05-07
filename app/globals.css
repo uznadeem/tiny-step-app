@@ -2161,6 +2161,9 @@ footer strong { color: rgba(255,255,255,0.7); }
 .admin-table-card {
   overflow: hidden;
 }
+.admin-table-block {
+  margin-top: 42px;
+}
 .admin-table-head,
 .admin-table-row {
   display: grid;
@@ -2195,6 +2198,16 @@ footer strong { color: rgba(255,255,255,0.7); }
 .admin-email-table .admin-table-head,
 .admin-email-table .admin-table-row {
   grid-template-columns: minmax(220px, 2fr) minmax(180px, 1fr) minmax(140px, 0.8fr);
+}
+.admin-waitlist-table .admin-table-head,
+.admin-waitlist-table .admin-table-row {
+  grid-template-columns:
+    minmax(130px, 0.85fr)
+    minmax(220px, 1.5fr)
+    minmax(150px, 1fr)
+    minmax(150px, 1fr)
+    minmax(150px, 1fr)
+    minmax(120px, 0.75fr);
 }
 .admin-table-row em {
   justify-self: start;
@@ -2338,6 +2351,10 @@ footer strong { color: rgba(255,255,255,0.7); }
   .admin-email-table .admin-table-head,
   .admin-email-table .admin-table-row {
     min-width: 680px;
+  }
+  .admin-waitlist-table .admin-table-head,
+  .admin-waitlist-table .admin-table-row {
+    min-width: 1120px;
   }
   .admin-table-row {
     font-size: 18px;

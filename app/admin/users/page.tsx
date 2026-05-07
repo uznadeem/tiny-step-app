@@ -1,10 +1,11 @@
 import AdminShell from '@/components/AdminShell'
+import AdminWaitlistTable from '@/components/AdminWaitlistTable'
 import { getAdminData } from '@/lib/server/admin-data'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminUsersPage() {
-  const { users } = await getAdminData()
+  const { users, waitlistRows } = await getAdminData()
 
   return (
     <AdminShell active="users">
@@ -32,6 +33,8 @@ export default async function AdminUsersPage() {
           ))}
           {!users.length && <p className="admin-empty">No users yet.</p>}
         </section>
+
+        <AdminWaitlistTable waitlistRows={waitlistRows} />
       </section>
     </AdminShell>
   )

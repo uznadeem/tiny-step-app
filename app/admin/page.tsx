@@ -1,11 +1,12 @@
 import AdminLaunchButton from '@/components/AdminLaunchButton'
 import AdminShell from '@/components/AdminShell'
+import AdminWaitlistTable from '@/components/AdminWaitlistTable'
 import { getAdminData, isCompletedTask } from '@/lib/server/admin-data'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminPage() {
-  const { profiles, tasks, signupBars, users } = await getAdminData()
+  const { profiles, tasks, signupBars, users, waitlistRows } = await getAdminData()
   const activeUsers = new Set(tasks.map(task => task.user_id)).size
   const completedTasks = tasks.filter(isCompletedTask).length
 
@@ -89,6 +90,8 @@ export default async function AdminPage() {
         <p className="admin-footnote">
           {completedTasks} completed tasks across {activeUsers} active users.
         </p>
+
+        <AdminWaitlistTable waitlistRows={waitlistRows} />
       </section>
     </AdminShell>
   )

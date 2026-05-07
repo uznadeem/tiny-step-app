@@ -56,6 +56,26 @@ export type AdminEmailRow = {
   sentAt: string
 }
 
+export type AdminWaitlistSubscriber = {
+  id: string
+  first_name: string | null
+  email: string
+  welcome_sent_at: string | null
+  followup_sent_at: string | null
+  launch_sent_at: string | null
+  status: string
+}
+
+export type AdminWaitlistRow = {
+  id: string
+  firstName: string
+  email: string
+  welcomeSentAt: string | null
+  followupSentAt: string | null
+  launchSentAt: string | null
+  status: string
+}
+
 const PLAN_SEQUENCE = ['Annual', 'Monthly', 'Trial', 'Annual', 'Monthly']
 const PROFILE_STATUS_LABELS: Record<AdminProfile['status'], AdminUserRow['status']> = {
   trial: 'Trial',
@@ -159,11 +179,37 @@ export function buildEmailRows(emailLogs: AdminEmailLog[]) {
   }))
 }
 
+export function buildWaitlistRows(waitlistSubscribers: AdminWaitlistSubscriber[]) {
+  return waitlistSubscribers.map((subscriber): AdminWaitlistRow => ({
+    id: subscriber.id,
+    firstName: subscriber.first_name || '—',
+    email: subscriber.email,
+    welcomeSentAt: subscriber.welcome_sent_at,
+    followupSentAt: subscriber.followup_sent_at,
+    launchSentAt: subscriber.launch_sent_at,
+    status: subscriber.status,
+  }))
+}
+
 export function formatAdminDate(value: string) {
   return new Date(value).toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
+  })
+}
+
+export function formatAdminDateTime(value: string | null) {
+  if (!value) {
+    return '—'
+  }
+
+  return new Date(value).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
   })
 }
 
@@ -174,6 +220,7 @@ export async function getAdminData() {
     { data: profiles, error: profilesError },
     { data: tasks, error: tasksError },
     { data: emailLogs, error: emailLogsError },
+    { data: waitlistSubscribers, error: waitlistSubscribersError },
   ] = await Promise.all([
     supabase
       .from('profiles')
@@ -200,10 +247,20 @@ export async function getAdminData() {
       .select('id, email, email_type, sent_at')
       .order('sent_at', { ascending: false })
       .limit(100),
+    supabase
+      .from('waitlist_subscribers')
+      .select('id, first_name, email, welcome_sent_at, followup_sent_at, launch_sent_at, status')
+      .order('email', { ascending: true }),
   ])
 
-  if (profilesError || tasksError || emailLogsError) {
-    throw new Error(profilesError?.message || tasksError?.message || emailLogsError?.message || 'Unable to load admin data.')
+  if (profilesError || tasksError || emailLogsError || waitlistSubscribersError) {
+    throw new Error(
+      profilesError?.message ||
+      tasksError?.message ||
+      emailLogsError?.message ||
+      waitlistSubscribersError?.message ||
+      'Unable to load admin data.'
+    )
   }
 
   const profileRows = (profiles || []) as AdminProfile[]
@@ -216,6 +273,7 @@ export async function getAdminData() {
     profiles: profileRows,
     tasks: taskRows,
     emailRows: buildEmailRows((emailLogs || []) as AdminEmailLog[]),
+    waitlistRows: buildWaitlistRows((waitlistSubscribers || []) as AdminWaitlistSubscriber[]),
     signupBars: buildSignupCounts(profileRows),
     users: buildUserRows(profileRows, taskRows),
     taskRows: buildTaskRows(profileRows, taskRows),
