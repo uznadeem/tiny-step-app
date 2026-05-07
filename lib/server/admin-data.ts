@@ -42,6 +42,20 @@ export type AdminTaskRow = {
   createdAt: string
 }
 
+export type AdminEmailLog = {
+  id: string
+  email: string
+  email_type: string
+  sent_at: string
+}
+
+export type AdminEmailRow = {
+  id: string
+  email: string
+  emailType: string
+  sentAt: string
+}
+
 const PLAN_SEQUENCE = ['Annual', 'Monthly', 'Trial', 'Annual', 'Monthly']
 const PROFILE_STATUS_LABELS: Record<AdminProfile['status'], AdminUserRow['status']> = {
   trial: 'Trial',
@@ -136,6 +150,15 @@ export function buildTaskRows(profiles: AdminProfile[], tasks: AdminTask[]) {
   })
 }
 
+export function buildEmailRows(emailLogs: AdminEmailLog[]) {
+  return emailLogs.map((log): AdminEmailRow => ({
+    id: log.id,
+    email: log.email,
+    emailType: log.email_type,
+    sentAt: log.sent_at,
+  }))
+}
+
 export function formatAdminDate(value: string) {
   return new Date(value).toLocaleDateString(undefined, {
     month: 'short',
@@ -147,7 +170,11 @@ export function formatAdminDate(value: string) {
 export async function getAdminData() {
   const supabase = createSupabaseAdminClient()
 
-  const [{ data: profiles, error: profilesError }, { data: tasks, error: tasksError }] = await Promise.all([
+  const [
+    { data: profiles, error: profilesError },
+    { data: tasks, error: tasksError },
+    { data: emailLogs, error: emailLogsError },
+  ] = await Promise.all([
     supabase
       .from('profiles')
       .select('id, email, display_name, status, created_at')
@@ -168,10 +195,15 @@ export async function getAdminData() {
         )
       `)
       .order('created_at', { ascending: false }),
+    supabase
+      .from('email_logs')
+      .select('id, email, email_type, sent_at')
+      .order('sent_at', { ascending: false })
+      .limit(100),
   ])
 
-  if (profilesError || tasksError) {
-    throw new Error(profilesError?.message || tasksError?.message || 'Unable to load admin data.')
+  if (profilesError || tasksError || emailLogsError) {
+    throw new Error(profilesError?.message || tasksError?.message || emailLogsError?.message || 'Unable to load admin data.')
   }
 
   const profileRows = (profiles || []) as AdminProfile[]
@@ -183,6 +215,7 @@ export async function getAdminData() {
   return {
     profiles: profileRows,
     tasks: taskRows,
+    emailRows: buildEmailRows((emailLogs || []) as AdminEmailLog[]),
     signupBars: buildSignupCounts(profileRows),
     users: buildUserRows(profileRows, taskRows),
     taskRows: buildTaskRows(profileRows, taskRows),

@@ -5,10 +5,16 @@ import { useEffect, useRef, useState } from 'react'
 export default function LandingPage() {
   const [count, setCount] = useState(847)
   const [finalSuccess, setFinalSuccess] = useState(false)
+  const [heroFirstName, setHeroFirstName] = useState('')
   const [heroEmail, setHeroEmail] = useState('')
+  const [finalFirstName, setFinalFirstName] = useState('')
   const [finalEmail, setFinalEmail] = useState('')
   const [heroBtnText, setHeroBtnText] = useState('Get early access →')
   const [heroBtnSuccess, setHeroBtnSuccess] = useState(false)
+  const [heroSubmitting, setHeroSubmitting] = useState(false)
+  const [heroError, setHeroError] = useState('')
+  const [finalSubmitting, setFinalSubmitting] = useState(false)
+  const [finalError, setFinalError] = useState('')
   const cursorRef = useRef<HTMLDivElement>(null)
 
   // Custom cursor
@@ -69,22 +75,62 @@ export default function LandingPage() {
     document.getElementById('waitlist')?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  const handleHeroSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    setCount(c => c + 1)
-    setHeroBtnText("🎉 You're in!")
-    setHeroBtnSuccess(true)
-    setTimeout(() => {
-      setHeroBtnText('Get early access →')
-      setHeroBtnSuccess(false)
-      setHeroEmail('')
-    }, 3000)
+  const joinWaitlist = async (firstName: string, email: string) => {
+    const response = await fetch('/api/waitlist', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        firstName,
+        email,
+      }),
+    })
+
+    const data = await response.json().catch(() => null)
+
+    if (!response.ok) {
+      throw new Error(data?.error || 'Something went wrong. Please try again.')
+    }
   }
 
-  const handleFinalSubmit = (e: React.FormEvent) => {
+  const handleHeroSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setCount(c => c + 1)
-    setFinalSuccess(true)
+
+    try {
+      setHeroSubmitting(true)
+      setHeroError('')
+      await joinWaitlist(heroFirstName, heroEmail)
+      setCount(c => c + 1)
+      setHeroBtnText("🎉 You're in!")
+      setHeroBtnSuccess(true)
+      setTimeout(() => {
+        setHeroBtnText('Get early access →')
+        setHeroBtnSuccess(false)
+        setHeroFirstName('')
+        setHeroEmail('')
+      }, 3000)
+    } catch (error) {
+      setHeroError(error instanceof Error ? error.message : 'Something went wrong. Please try again.')
+    } finally {
+      setHeroSubmitting(false)
+    }
+  }
+
+  const handleFinalSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    try {
+      setFinalSubmitting(true)
+      setFinalError('')
+      await joinWaitlist(finalFirstName, finalEmail)
+      setCount(c => c + 1)
+      setFinalSuccess(true)
+    } catch (error) {
+      setFinalError(error instanceof Error ? error.message : 'Something went wrong. Please try again.')
+    } finally {
+      setFinalSubmitting(false)
+    }
   }
 
   return (
@@ -114,9 +160,18 @@ export default function LandingPage() {
             </p>
             <form className="waitlist-form" onSubmit={handleHeroSubmit}>
               <input
+                type="text"
+                placeholder="First name"
+                required
+                autoComplete="given-name"
+                value={heroFirstName}
+                onChange={e => setHeroFirstName(e.target.value)}
+              />
+              <input
                 type="email"
                 placeholder="your@email.com"
                 required
+                autoComplete="email"
                 value={heroEmail}
                 onChange={e => setHeroEmail(e.target.value)}
               />
@@ -124,11 +179,12 @@ export default function LandingPage() {
                 type="submit"
                 className="btn-coral"
                 style={heroBtnSuccess ? { background: '#10b981' } : {}}
-                disabled={heroBtnSuccess}
+                disabled={heroBtnSuccess || heroSubmitting}
               >
-                {heroBtnText}
+                {heroSubmitting ? 'Joining...' : heroBtnText}
               </button>
             </form>
+            {heroError && <p className="waitlist-error">{heroError}</p>}
             <p className="hero-meta">
               <strong>{count.toLocaleString()} women</strong> already on the waitlist · Free to start
             </p>
@@ -312,14 +368,26 @@ export default function LandingPage() {
             <p>Join 800+ women waiting for a planner that finally works with their ADHD brain.</p>
             <form className="final-form" onSubmit={handleFinalSubmit}>
               <input
+                type="text"
+                placeholder="First name"
+                required
+                autoComplete="given-name"
+                value={finalFirstName}
+                onChange={e => setFinalFirstName(e.target.value)}
+              />
+              <input
                 type="email"
                 placeholder="your@email.com"
                 required
+                autoComplete="email"
                 value={finalEmail}
                 onChange={e => setFinalEmail(e.target.value)}
               />
-              <button type="submit" className="btn-plum-solid">I&apos;m in →</button>
+              <button type="submit" className="btn-plum-solid" disabled={finalSubmitting}>
+                {finalSubmitting ? 'Joining...' : "I'm in →"}
+              </button>
             </form>
+            {finalError && <p className="waitlist-error final">{finalError}</p>}
             <p className="final-meta">No spam. No streak pressure. Just early access when we launch. ✨</p>
           </div>
         ) : (

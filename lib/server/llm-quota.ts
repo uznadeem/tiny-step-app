@@ -1,7 +1,7 @@
 import { createSupabaseAdminClient } from '@/lib/server/supabase-admin'
+import { getAppTimeZone } from '@/lib/server/time-zone'
 
 const DEFAULT_DAILY_LIMIT = 20
-const DEFAULT_TIME_ZONE = 'Asia/Karachi'
 
 export type LlmQuota = {
   allowed: boolean
@@ -50,7 +50,7 @@ function normalizeQuotaRow(value: unknown): QuotaRow | null {
 
 export async function consumeLlmQuota(userId: string): Promise<LlmQuota> {
   const dailyLimit = parsePositiveInteger(process.env.LLM_DAILY_LIMIT, DEFAULT_DAILY_LIMIT)
-  const timeZone = process.env.LLM_QUOTA_TIME_ZONE || DEFAULT_TIME_ZONE
+  const timeZone = getAppTimeZone()
   let supabase: ReturnType<typeof createSupabaseAdminClient>
 
   try {

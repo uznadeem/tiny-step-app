@@ -2,7 +2,7 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 
 type AdminShellProps = {
-  active: 'overview' | 'users' | 'tasks'
+  active: 'overview' | 'users' | 'tasks' | 'emails'
   children: ReactNode
 }
 
@@ -22,7 +22,7 @@ export default function AdminShell({ active, children }: AdminShellProps) {
               <Link className={active === 'users' ? 'active' : ''} href="/admin/users"><span>👩</span> Users</Link>
               <button type="button" disabled><span>💳</span> Revenue</button>
               <Link className={active === 'tasks' ? 'active' : ''} href="/admin/tasks"><span>✅</span> Tasks</Link>
-              <button type="button" disabled><span>📧</span> Emails</button>
+              <Link className={active === 'emails' ? 'active' : ''} href="/admin/emails"><span>📧</span> Emails</Link>
             </nav>
           </aside>
 

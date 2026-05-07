@@ -1,3 +1,4 @@
+import AdminLaunchButton from '@/components/AdminLaunchButton'
 import AdminShell from '@/components/AdminShell'
 import { getAdminData, isCompletedTask } from '@/lib/server/admin-data'
 
@@ -64,6 +65,8 @@ export default async function AdminPage() {
             </footer>
           </article>
         </div>
+
+        <AdminLaunchButton />
 
         <section className="admin-table-card">
           <div className="admin-table-head">
