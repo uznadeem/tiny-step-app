@@ -569,6 +569,7 @@ export default function PlannerPage() {
         <p>⭐ Yearly plan</p>
 
         <nav className="planner-drawer-nav" aria-label="Dashboard menu">
+          <Link href="/dashboard" onClick={() => setDrawerOpen(false)}><span>🏠</span> Home</Link>
           <Link href="/profile" onClick={() => setDrawerOpen(false)}><span>⚙️</span> Preferences</Link>
           <Link href="/history" onClick={() => setDrawerOpen(false)}><span>✅</span> Task History</Link>
           <button type="button" disabled><span>💳</span> Billing</button>

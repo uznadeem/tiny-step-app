@@ -134,6 +134,7 @@ export default function ProfileSettingsPage() {
             <p>⭐ Yearly plan</p>
 
             <nav className="profile-nav" aria-label="Profile settings">
+              <Link href="/dashboard"><span>🏠</span> Home</Link>
               <button className="active" type="button"><span>⚙️</span> Preferences</button>
               <Link href="/history"><span>✅</span> Task History</Link>
               <button type="button" disabled><span>💳</span> Billing</button>

@@ -245,6 +245,7 @@ export default function TaskHistoryPage() {
             <p>⭐ Yearly plan</p>
 
             <nav className="profile-nav" aria-label="Task history">
+              <Link href="/dashboard"><span>🏠</span> Home</Link>
               <Link href="/profile"><span>⚙️</span> Preferences</Link>
               <Link className="active" href="/history"><span>✅</span> Task History</Link>
               <button type="button" disabled><span>💳</span> Billing</button>
