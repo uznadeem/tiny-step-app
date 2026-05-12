@@ -2203,6 +2203,10 @@ footer strong { color: rgba(255,255,255,0.7); }
 .admin-email-table .admin-table-row {
   grid-template-columns: minmax(220px, 2fr) minmax(180px, 1fr) minmax(140px, 0.8fr);
 }
+.admin-revenue-table .admin-table-head,
+.admin-revenue-table .admin-table-row {
+  grid-template-columns: minmax(220px, 2fr) minmax(130px, 0.75fr) minmax(110px, 0.65fr) minmax(150px, 0.8fr) minmax(150px, 0.85fr);
+}
 .admin-waitlist-table .admin-table-head,
 .admin-waitlist-table .admin-table-row {
   grid-template-columns:
@@ -2355,6 +2359,10 @@ footer strong { color: rgba(255,255,255,0.7); }
   .admin-email-table .admin-table-head,
   .admin-email-table .admin-table-row {
     min-width: 680px;
+  }
+  .admin-revenue-table .admin-table-head,
+  .admin-revenue-table .admin-table-row {
+    min-width: 980px;
   }
   .admin-waitlist-table .admin-table-head,
   .admin-waitlist-table .admin-table-row {

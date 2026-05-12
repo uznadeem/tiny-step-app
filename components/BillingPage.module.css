@@ -1,0 +1,292 @@
+.heading {
+  margin-bottom: 24px;
+}
+
+.heading h2 {
+  margin: 0 0 6px;
+  color: var(--plum);
+  font-size: clamp(30px, 4vw, 42px);
+  font-weight: 900;
+}
+
+.heading p {
+  margin: 0;
+  color: rgba(45, 27, 78, 0.48);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.statusCard {
+  margin-bottom: 22px;
+  padding: 28px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #2d1b4e, #5b2d90);
+  color: white;
+}
+
+.statusLabel {
+  display: block;
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.48);
+  font-family: 'Unbounded', sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.statusTitle {
+  margin: 0 0 8px;
+  font-size: clamp(32px, 4vw, 50px);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.statusTitle span {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 24px;
+}
+
+.statusCopy {
+  max-width: 720px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.statusActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.statusActions button {
+  min-height: 52px;
+  padding: 0 24px;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  background: white;
+  color: var(--plum);
+  font: 900 16px/1 'Nunito', sans-serif;
+  cursor: pointer;
+}
+
+.statusActions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.statusActions .secondaryAction {
+  border-color: rgba(255, 255, 255, 0.25);
+  background: transparent;
+  color: white;
+}
+
+.plans {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.planCard {
+  padding: 24px;
+  border: 2px solid rgba(45, 27, 78, 0.08);
+  border-radius: 22px;
+  background: white;
+}
+
+.planCard strong {
+  display: block;
+  color: var(--plum);
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.price {
+  margin: 12px 0 8px;
+  color: var(--plum);
+  font-family: 'Unbounded', sans-serif;
+  font-size: clamp(34px, 4vw, 48px);
+  font-weight: 900;
+}
+
+.price span {
+  color: rgba(45, 27, 78, 0.48);
+  font-family: 'Nunito', sans-serif;
+  font-size: 18px;
+}
+
+.planCard p {
+  min-height: 48px;
+  margin: 0 0 20px;
+  color: rgba(45, 27, 78, 0.52);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.planCard button,
+.manageButton {
+  min-height: 52px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--coral), #7c3aed);
+  color: white;
+  font: 900 16px/1 'Nunito', sans-serif;
+  cursor: pointer;
+}
+
+.planCard button:disabled,
+.manageButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.detailsCard {
+  padding: 24px;
+  border: 2px solid rgba(45, 27, 78, 0.08);
+  border-radius: 22px;
+  background: white;
+}
+
+.portalCard {
+  margin-bottom: 22px;
+  padding: 24px;
+  border: 2px solid rgba(45, 27, 78, 0.08);
+  border-radius: 22px;
+  background: white;
+}
+
+.portalCard h3 {
+  margin: 0 0 18px;
+  color: var(--plum);
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.portalRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.portalRow strong {
+  display: block;
+  color: var(--plum);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.portalRow p,
+.portalCard > p {
+  margin: 4px 0 0;
+  color: rgba(45, 27, 78, 0.42);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.portalRow button,
+.invoiceRows button {
+  border: 0;
+  background: transparent;
+  color: #7c3aed;
+  font: 900 16px/1 'Nunito', sans-serif;
+  cursor: pointer;
+}
+
+.portalRow button:disabled,
+.invoiceRows button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.invoiceRows {
+  display: grid;
+  gap: 10px;
+}
+
+.invoiceRows div {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(120px, 1.2fr) minmax(80px, auto) minmax(50px, auto);
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(45, 27, 78, 0.08);
+}
+
+.invoiceRows span {
+  color: rgba(45, 27, 78, 0.42);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.invoiceRows strong,
+.invoiceRows em {
+  color: var(--plum);
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.detailsCard h3 {
+  margin: 0 0 18px;
+  color: var(--plum);
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.detailRows {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.detailRows div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(45, 27, 78, 0.08);
+  color: rgba(45, 27, 78, 0.52);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.detailRows strong {
+  color: var(--plum);
+  text-align: right;
+}
+
+@media (max-width: 760px) {
+  .plans {
+    grid-template-columns: 1fr;
+  }
+
+  .statusCard,
+  .planCard,
+  .detailsCard,
+  .portalCard {
+    padding: 20px;
+  }
+
+  .detailRows div,
+  .portalRow {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .invoiceRows div {
+    grid-template-columns: 1fr;
+  }
+
+  .detailRows strong {
+    text-align: left;
+  }
+}

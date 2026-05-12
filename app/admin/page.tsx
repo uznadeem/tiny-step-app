@@ -6,7 +6,7 @@ import { getAdminData, isCompletedTask } from '@/lib/server/admin-data'
 export const dynamic = 'force-dynamic'
 
 export default async function AdminPage() {
-  const { profiles, tasks, signupBars, users, waitlistRows } = await getAdminData()
+  const { tasks, signupBars, overviewStats, users, waitlistRows } = await getAdminData()
   const activeUsers = new Set(tasks.map(task => task.user_id)).size
   const completedTasks = tasks.filter(isCompletedTask).length
 
@@ -16,23 +16,25 @@ export default async function AdminPage() {
         <div className="admin-stats">
           <article>
             <span>Total Users</span>
-            <strong>{profiles.length}</strong>
-            <em className="up">↑ +{signupBars.reduce((sum, day) => sum + day.count, 0)} this week</em>
+            <strong>{overviewStats.totalUsers}</strong>
+            <em className="up">↑ +{overviewStats.signupsThisWeek} this week</em>
           </article>
           <article>
             <span>Paying</span>
-            <strong>142</strong>
-            <em className="up">↑ +8 this week</em>
+            <strong>{overviewStats.payingUsers}</strong>
+            <em className="up">↑ +{overviewStats.payingUsersThisWeek} this week</em>
           </article>
           <article>
             <span>MRR</span>
-            <strong>$994</strong>
-            <em className="up">↑ +$56</em>
+            <strong>${overviewStats.mrr}</strong>
+            <em className="up">↑ +${overviewStats.mrrAddedThisWeek}</em>
           </article>
           <article>
             <span>Churn</span>
-            <strong>3.2%</strong>
-            <em className="down">↓ -0.4%</em>
+            <strong>{overviewStats.churnRate}%</strong>
+            <em className={overviewStats.churnRate > 0 ? 'down' : 'up'}>
+              {overviewStats.churnRate > 0 ? '↓' : '↑'} {overviewStats.churnRate}%
+            </em>
           </article>
         </div>
 
@@ -53,16 +55,16 @@ export default async function AdminPage() {
           <article className="admin-chart-card admin-plan-card">
             <h2>Plan split</h2>
             <div>
-              <p><span>Annual ($49)</span><strong>63%</strong></p>
-              <div><span style={{ width: '63%' }} /></div>
+              <p><span>Annual ($49)</span><strong>{overviewStats.annualPlanPercent}%</strong></p>
+              <div><span style={{ width: `${overviewStats.annualPlanPercent}%` }} /></div>
             </div>
             <div>
-              <p><span>Monthly ($7)</span><strong>37%</strong></p>
-              <div><span className="coral" style={{ width: '37%' }} /></div>
+              <p><span>Monthly ($7)</span><strong>{overviewStats.monthlyPlanPercent}%</strong></p>
+              <div><span className="coral" style={{ width: `${overviewStats.monthlyPlanPercent}%` }} /></div>
             </div>
             <footer>
-              <strong>Free trial <span>705 users</span></strong>
-              <small>83% still in trial window</small>
+              <strong>Free trial <span>{overviewStats.trialUsers} users</span></strong>
+              <small>{overviewStats.trialPercent}% still in trial window</small>
             </footer>
           </article>
         </div>

@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useRouter } from 'next/navigation'
+import { getBillingAccess, type BillingProfile } from '@/lib/billing'
 import { supabase } from '@/lib/supabase/client'
 import { playCheckboxSound, playCompletionSound } from '@/lib/sound-effects'
 
@@ -234,11 +235,16 @@ export default function PlannerPage() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('display_name, preferences')
+        .select('display_name, preferences, status, plan_interval, trial_ends_at, current_period_end, cancel_at_period_end, stripe_status')
         .eq('id', data.session.user.id)
         .maybeSingle()
 
       if (!active) return
+
+      if (!getBillingAccess(profile as BillingProfile | null).allowed) {
+        router.replace('/billing')
+        return
+      }
 
       const plannerPreferences = normalizePlannerPreferences(profile?.preferences)
       setDefaultEnergy(plannerPreferences.defaultEnergy)
@@ -572,7 +578,7 @@ export default function PlannerPage() {
           <Link href="/dashboard" onClick={() => setDrawerOpen(false)}><span>🏠</span> Home</Link>
           <Link href="/profile" onClick={() => setDrawerOpen(false)}><span>⚙️</span> Preferences</Link>
           <Link href="/history" onClick={() => setDrawerOpen(false)}><span>✅</span> Task History</Link>
-          <button type="button" disabled><span>💳</span> Billing</button>
+          <Link href="/billing" onClick={() => setDrawerOpen(false)}><span>💳</span> Billing</Link>
           <button className="logout" type="button" onClick={handleSignOut}><span>🚪</span> Log out</button>
         </nav>
       </aside>

@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useState } from 'react'
+import { getBillingAccess, type BillingProfile } from '@/lib/billing'
 import { supabase } from '@/lib/supabase/client'
 
 type AuthMode = 'signup' | 'login' | 'reset'
@@ -52,6 +53,16 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
   const copy = modeCopy[mode]
 
+  const redirectAfterAuth = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('status, plan_interval, trial_ends_at, current_period_end, cancel_at_period_end, stripe_status')
+      .eq('id', userId)
+      .maybeSingle()
+
+    router.replace(getBillingAccess(data as BillingProfile | null).redirectTo)
+  }, [router])
+
   useEffect(() => {
     let active = true
 
@@ -59,7 +70,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
       if (!active) return
 
       if (data.session) {
-        router.replace('/dashboard')
+        redirectAfterAuth(data.session.user.id)
         return
       }
 
@@ -68,7 +79,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        router.replace('/dashboard')
+        redirectAfterAuth(session.user.id)
       }
     })
 
@@ -76,7 +87,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
       active = false
       listener.subscription.unsubscribe()
     }
-  }, [router])
+  }, [redirectAfterAuth])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -100,7 +111,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
         if (signUpError) throw signUpError
         if (data.session) {
-          router.push('/dashboard')
+          await redirectAfterAuth(data.session.user.id)
           return
         }
 
@@ -109,13 +120,15 @@ export default function AuthForm({ mode }: AuthFormProps) {
       }
 
       if (mode === 'login') {
-        const { error: loginError } = await supabase.auth.signInWithPassword({
+        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
 
         if (loginError) throw loginError
-        router.push('/dashboard')
+        if (loginData.user) {
+          await redirectAfterAuth(loginData.user.id)
+        }
         return
       }
 
