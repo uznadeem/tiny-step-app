@@ -1,5 +1,6 @@
 import { jsonError, parseString } from '@/lib/server/api'
 import { createAnthropicMessage } from '@/lib/server/anthropic'
+import { getUserBillingAccess } from '@/lib/server/billing'
 import { consumeLlmQuota, LlmQuotaError, quotaExceededMessage, quotaHeaders, type LlmQuota } from '@/lib/server/llm-quota'
 import { getAuthenticatedUser } from '@/lib/server/supabase'
 
@@ -38,6 +39,12 @@ export async function POST(request: Request) {
 
     if (!remainingSteps.length) {
       return jsonError('At least one remaining step is required.', 400)
+    }
+
+    const billingAccess = await getUserBillingAccess(authenticated.id)
+
+    if (!billingAccess.allowed) {
+      return jsonError('Your trial has ended. Please choose a plan to continue using Tinystep.', 402)
     }
 
     quota = await consumeLlmQuota(authenticated.id)

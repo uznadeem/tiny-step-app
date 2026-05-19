@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { getBillingAccess, type BillingProfile } from '@/lib/billing'
 import { supabase } from '@/lib/supabase/client'
 
 type Preferences = {
@@ -64,11 +65,16 @@ export default function ProfileSettingsPage() {
 
       const { data, error: profileError } = await supabase
         .from('profiles')
-        .select('email, display_name, preferences')
+        .select('email, display_name, preferences, status, plan_interval, trial_ends_at, current_period_end, cancel_at_period_end, stripe_status')
         .eq('id', user.id)
         .maybeSingle()
 
       if (!active) return
+
+      if (!getBillingAccess(data as BillingProfile | null).allowed) {
+        router.replace('/billing')
+        return
+      }
 
       setUserId(user.id)
       setDisplayName(data?.display_name || user.user_metadata?.display_name || '')
@@ -137,7 +143,7 @@ export default function ProfileSettingsPage() {
               <Link href="/dashboard"><span>🏠</span> Home</Link>
               <button className="active" type="button"><span>⚙️</span> Preferences</button>
               <Link href="/history"><span>✅</span> Task History</Link>
-              <button type="button" disabled><span>💳</span> Billing</button>
+              <Link href="/billing"><span>💳</span> Billing</Link>
               <button className="logout" type="button" onClick={handleSignOut}><span>🚪</span> Log out</button>
             </nav>
           </aside>

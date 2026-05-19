@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { getBillingAccess, type BillingProfile } from '@/lib/billing'
 import { supabase } from '@/lib/supabase/client'
 import { playCheckboxSound, playCompletionSound } from '@/lib/sound-effects'
 
@@ -90,7 +91,7 @@ export default function TaskHistoryPage() {
       const [{ data: profile }, { data: taskRows, error: historyError }] = await Promise.all([
         supabase
           .from('profiles')
-          .select('display_name, preferences')
+          .select('display_name, preferences, status, plan_interval, trial_ends_at, current_period_end, cancel_at_period_end, stripe_status')
           .eq('id', user.id)
           .maybeSingle(),
         supabase
@@ -116,6 +117,11 @@ export default function TaskHistoryPage() {
       ])
 
       if (!active) return
+
+      if (!getBillingAccess(profile as BillingProfile | null).allowed) {
+        router.replace('/billing')
+        return
+      }
 
       setDisplayName(profile?.display_name || user.user_metadata?.display_name || 'Tinystep friend')
       setSoundEffects(normalizeHistoryPreferences(profile?.preferences).soundEffects)
@@ -248,7 +254,7 @@ export default function TaskHistoryPage() {
               <Link href="/dashboard"><span>🏠</span> Home</Link>
               <Link href="/profile"><span>⚙️</span> Preferences</Link>
               <Link className="active" href="/history"><span>✅</span> Task History</Link>
-              <button type="button" disabled><span>💳</span> Billing</button>
+              <Link href="/billing"><span>💳</span> Billing</Link>
               <button className="logout" type="button" onClick={handleSignOut}><span>🚪</span> Log out</button>
             </nav>
           </aside>

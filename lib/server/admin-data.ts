@@ -5,6 +5,11 @@ export type AdminProfile = {
   email: string | null
   display_name: string | null
   status: 'trial' | 'active' | 'inactive'
+  stripe_subscription_id: string | null
+  plan_interval: string | null
+  current_period_end: string | null
+  cancel_at_period_end: boolean | null
+  stripe_status: string | null
   created_at: string
 }
 
@@ -76,11 +81,89 @@ export type AdminWaitlistRow = {
   status: string
 }
 
-const PLAN_SEQUENCE = ['Annual', 'Monthly', 'Trial', 'Annual', 'Monthly']
+export type AdminRevenueRow = {
+  id: string
+  customer: string
+  plan: string
+  mrr: number
+  status: 'Trial' | 'Active' | 'Inactive'
+  stripeStatus: string
+  renewsOrEndsAt: string | null
+  cancelAtPeriodEnd: boolean
+}
+
+export type AdminOverviewStats = {
+  totalUsers: number
+  signupsThisWeek: number
+  payingUsers: number
+  payingUsersThisWeek: number
+  mrr: number
+  mrrAddedThisWeek: number
+  churnRate: number
+  annualPaidUsers: number
+  monthlyPaidUsers: number
+  annualPlanPercent: number
+  monthlyPlanPercent: number
+  trialUsers: number
+  trialPercent: number
+}
+
 const PROFILE_STATUS_LABELS: Record<AdminProfile['status'], AdminUserRow['status']> = {
   trial: 'Trial',
   active: 'Active',
   inactive: 'Inactive',
+}
+
+const MONTHLY_PRICE = 7
+const ANNUAL_PRICE = 49
+
+function isCurrentPaidProfile(profile: AdminProfile) {
+  if (profile.status !== 'active' || !profile.stripe_subscription_id) {
+    return false
+  }
+
+  if (!profile.current_period_end) {
+    return profile.stripe_status === 'active' || profile.stripe_status === 'trialing'
+  }
+
+  return new Date(profile.current_period_end).getTime() > Date.now()
+}
+
+function hasHadPaidSubscription(profile: AdminProfile) {
+  return Boolean(profile.stripe_subscription_id)
+}
+
+function isCurrentWeekDate(value: string) {
+  const date = new Date(value)
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
+  sevenDaysAgo.setHours(0, 0, 0, 0)
+
+  return date.getTime() >= sevenDaysAgo.getTime()
+}
+
+function getPlanLabel(profile: AdminProfile) {
+  if (profile.plan_interval === 'annual') return 'Annual'
+  if (profile.plan_interval === 'monthly') return 'Monthly'
+  if (profile.status === 'trial') return 'Trial'
+
+  return 'No plan'
+}
+
+function getMonthlyRecurringRevenue(profile: AdminProfile) {
+  if (!isCurrentPaidProfile(profile)) return 0
+  if (profile.plan_interval === 'annual') return ANNUAL_PRICE / 12
+  if (profile.plan_interval === 'monthly') return MONTHLY_PRICE
+
+  return 0
+}
+
+export function formatCurrency(value: number) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(value)
 }
 
 export function isCompletedTask(task: AdminTask) {
@@ -138,14 +221,14 @@ export function buildUserRows(profiles: AdminProfile[], tasks: AdminTask[]) {
     tasksByUser.set(task.user_id, [...(tasksByUser.get(task.user_id) || []), task])
   })
 
-  return profiles.map((profile, index): AdminUserRow => {
+  return profiles.map((profile): AdminUserRow => {
     const userTasks = tasksByUser.get(profile.id) || []
     const tasksDone = userTasks.filter(isCompletedTask).length
 
     return {
       id: profile.id,
       email: profile.email || profile.display_name || 'Unknown user',
-      plan: PLAN_SEQUENCE[index % PLAN_SEQUENCE.length],
+      plan: getPlanLabel(profile),
       tasksDone,
       totalTasks: userTasks.length,
       status: PROFILE_STATUS_LABELS[profile.status] || 'Trial',
@@ -191,6 +274,21 @@ export function buildWaitlistRows(waitlistSubscribers: AdminWaitlistSubscriber[]
   }))
 }
 
+export function buildRevenueRows(profiles: AdminProfile[]) {
+  return profiles
+    .filter(profile => profile.stripe_subscription_id || profile.status === 'active')
+    .map((profile): AdminRevenueRow => ({
+      id: profile.id,
+      customer: profile.email || profile.display_name || 'Unknown user',
+      plan: getPlanLabel(profile),
+      mrr: getMonthlyRecurringRevenue(profile),
+      status: PROFILE_STATUS_LABELS[profile.status] || 'Trial',
+      stripeStatus: profile.stripe_status || 'none',
+      renewsOrEndsAt: profile.current_period_end,
+      cancelAtPeriodEnd: Boolean(profile.cancel_at_period_end),
+    }))
+}
+
 export function formatAdminDate(value: string) {
   return new Date(value).toLocaleDateString(undefined, {
     month: 'short',
@@ -213,6 +311,36 @@ export function formatAdminDateTime(value: string | null) {
   })
 }
 
+export function buildOverviewStats(profiles: AdminProfile[]): AdminOverviewStats {
+  const paidProfiles = profiles.filter(isCurrentPaidProfile)
+  const weeklyProfiles = profiles.filter(profile => isCurrentWeekDate(profile.created_at))
+  const weeklyPaidProfiles = weeklyProfiles.filter(isCurrentPaidProfile)
+  const annualPaidUsers = paidProfiles.filter(profile => profile.plan_interval === 'annual').length
+  const monthlyPaidUsers = paidProfiles.filter(profile => profile.plan_interval === 'monthly').length
+  const paidPlanCount = annualPaidUsers + monthlyPaidUsers
+  const inactivePaidUsers = profiles.filter(
+    profile => profile.status === 'inactive' && hasHadPaidSubscription(profile)
+  ).length
+  const churnDenominator = paidProfiles.length + inactivePaidUsers
+  const trialUsers = profiles.filter(profile => profile.status === 'trial').length
+
+  return {
+    totalUsers: profiles.length,
+    signupsThisWeek: weeklyProfiles.length,
+    payingUsers: paidProfiles.length,
+    payingUsersThisWeek: weeklyPaidProfiles.length,
+    mrr: Math.round(paidProfiles.reduce((sum, profile) => sum + getMonthlyRecurringRevenue(profile), 0)),
+    mrrAddedThisWeek: Math.round(weeklyPaidProfiles.reduce((sum, profile) => sum + getMonthlyRecurringRevenue(profile), 0)),
+    churnRate: churnDenominator ? Math.round((inactivePaidUsers / churnDenominator) * 1000) / 10 : 0,
+    annualPaidUsers,
+    monthlyPaidUsers,
+    annualPlanPercent: paidPlanCount ? Math.round((annualPaidUsers / paidPlanCount) * 100) : 0,
+    monthlyPlanPercent: paidPlanCount ? Math.round((monthlyPaidUsers / paidPlanCount) * 100) : 0,
+    trialUsers,
+    trialPercent: profiles.length ? Math.round((trialUsers / profiles.length) * 100) : 0,
+  }
+}
+
 export async function getAdminData() {
   const supabase = createSupabaseAdminClient()
 
@@ -224,7 +352,7 @@ export async function getAdminData() {
   ] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id, email, display_name, status, created_at')
+      .select('id, email, display_name, status, stripe_subscription_id, plan_interval, current_period_end, cancel_at_period_end, stripe_status, created_at')
       .order('created_at', { ascending: false }),
     supabase
       .from('tasks')
@@ -275,7 +403,9 @@ export async function getAdminData() {
     emailRows: buildEmailRows((emailLogs || []) as AdminEmailLog[]),
     waitlistRows: buildWaitlistRows((waitlistSubscribers || []) as AdminWaitlistSubscriber[]),
     signupBars: buildSignupCounts(profileRows),
+    overviewStats: buildOverviewStats(profileRows),
     users: buildUserRows(profileRows, taskRows),
+    revenueRows: buildRevenueRows(profileRows),
     taskRows: buildTaskRows(profileRows, taskRows),
   }
 }
